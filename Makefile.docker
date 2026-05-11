@@ -27,9 +27,10 @@ endif
 
 # VERSION is the version we should download and use.
 VERSION:=
-# DOCKER is the docker image repo we need to push to.
+# DOCKER is the docker image repo we need to push to, e.g. ghcr.io/<owner>.
 DOCKER:=
 NAME:=coredns
+# Base URL used to download release assets (override for forks/workflows).
 GITHUB:=https://github.com/coredns/coredns/releases/download
 # mips is not in LINUX_ARCH because it's not supported by docker manifest. Keep this list in sync with the one in Makefile.release
 LINUX_ARCH:=amd64 arm arm64 mips64le ppc64le s390x riscv64
@@ -78,7 +79,7 @@ endif
 .PHONY: docker-build
 docker-build:
 ifeq ($(DOCKER),)
-	$(error "Please specify Docker registry to use. Use DOCKER=coredns for releases")
+	$(error "Please specify Docker registry to use. Use DOCKER=ghcr.io/<owner> for releases")
 else
 	docker version
 	for arch in $(LINUX_ARCH); do \
@@ -97,7 +98,7 @@ ifeq ($(VERSION),)
 	$(error "Please specify a version use. Use VERSION=<version>")
 endif
 ifeq ($(DOCKER),)
-	$(error "Please specify Docker registry to use. Use DOCKER=coredns for releases")
+	$(error "Please specify Docker registry to use. Use DOCKER=ghcr.io/<owner> for releases")
 else
 	@# Pushes coredns/coredns-$arch:$version images
 	@# Creates manifest for multi-arch image
@@ -110,8 +111,18 @@ else
 	docker manifest create --amend $(DOCKER_IMAGE_NAME):latest $(DOCKER_IMAGE_LIST_VERSIONED)
 	docker manifest push --purge $(DOCKER_IMAGE_NAME):$(VERSION)
 	docker manifest push --purge $(DOCKER_IMAGE_NAME):latest
-	TOKEN=$$(curl -s -H "Content-Type: application/json" -X POST -d "{\"username\":\"$${DOCKER_LOGIN}\",\"password\":\"$${DOCKER_PASSWORD}\"}" "https://hub.docker.com/v2/users/login/" | jq -r .token) ; \
-	for arch in $(LINUX_ARCH); do \
-		curl -X DELETE -H "Authorization: JWT $${TOKEN}" "https://hub.docker.com/v2/repositories/$(DOCKER_IMAGE_NAME)/tags/$${arch}-$(VERSION)/" ;\
-	done
+	@# Docker Hub supports deleting temporary per-arch tags via API.
+	@# Other registries (e.g. GHCR) do not use this path, so we skip cleanup.
+	REPO_PREFIX=$${DOCKER_IMAGE_NAME%%/*}; \
+	case "$${REPO_PREFIX}" in \
+		*.*|*:* ) \
+			echo "Skipping per-arch tag cleanup for registry $(DOCKER_IMAGE_NAME)"; \
+			;; \
+		* ) \
+			TOKEN=$$(curl -s -H "Content-Type: application/json" -X POST -d "{\"username\":\"$${DOCKER_LOGIN}\",\"password\":\"$${DOCKER_PASSWORD}\"}" "https://hub.docker.com/v2/users/login/" | jq -r .token) ; \
+			for arch in $(LINUX_ARCH); do \
+				curl -X DELETE -H "Authorization: JWT $${TOKEN}" "https://hub.docker.com/v2/repositories/$(DOCKER_IMAGE_NAME)/tags/$${arch}-$(VERSION)/" ;\
+			done; \
+			;; \
+	esac
 endif
