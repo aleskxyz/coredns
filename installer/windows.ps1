@@ -3,10 +3,20 @@
 .SYNOPSIS
   Idempotent CoreDNS (aleskxyz) Windows setup: download, config, service, start, adapter DNS.
 
-  Run (Administrator console). Do not use ".\script.ps1" alone if policy blocks it — that hits
-  PSSecurityException ("running scripts is disabled"). Always use Bypass for this file, e.g.:
-    powershell.exe -ExecutionPolicy Bypass -File "C:\Users\YOU\Desktop\coredns.ps1"
-    powershell.exe -ExecutionPolicy Bypass -File .\docs\install-windows-aleskxyz.ps1
+  Run in an elevated (Administrator) PowerShell. If execution policy blocks scripts, use Bypass
+  (do not rely on .\script.ps1 alone — that can raise PSSecurityException).
+
+  Remote (release branch) — install / upgrade:
+    $u = 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/release/installer/windows.ps1'
+    $p = Join-Path $env:TEMP 'install_coredns_windows.ps1'
+    Invoke-WebRequest -Uri $u -OutFile $p -UseBasicParsing
+    powershell.exe -ExecutionPolicy Bypass -File $p
+
+  Remote — uninstall (append -Uninstall to the last line):
+    powershell.exe -ExecutionPolicy Bypass -File $p -Uninstall
+
+  From a clone (repo root as current directory):
+    powershell.exe -ExecutionPolicy Bypass -File .\installer\windows.ps1
 
   If coredns.exe is already installed and matches $Ver: skips download, extract, copy, and service delete.
   Full remove: -Uninstall (service, dirs, temp zip/stage; adapter DNS set to same defaults as Linux uninstall — 217.218.127.127 / 217.218.155.155 on IPv4, IPv6 back to DHCP).
@@ -117,19 +127,19 @@ if ($Uninstall) {
   Remove-CoreDnsService -ForUninstall
 
   if (Test-Path -LiteralPath $BinDir) {
-    Write-Host "[CoreDNS] Uninstall: removing $BinDir" -ForegroundColor Cyan
+    Write-Host ('[CoreDNS] Uninstall: removing {0}' -f $BinDir) -ForegroundColor Cyan
     Remove-Item -LiteralPath $BinDir -Recurse -Force -ErrorAction Stop
   }
   else {
-    Write-Host "[CoreDNS] Uninstall: not present: $BinDir" -ForegroundColor Gray
+    Write-Host ('[CoreDNS] Uninstall: not present: {0}' -f $BinDir) -ForegroundColor Gray
   }
 
   if (Test-Path -LiteralPath $Data) {
-    Write-Host "[CoreDNS] Uninstall: removing $Data" -ForegroundColor Cyan
+    Write-Host ('[CoreDNS] Uninstall: removing {0}' -f $Data) -ForegroundColor Cyan
     Remove-Item -LiteralPath $Data -Recurse -Force -ErrorAction Stop
   }
   else {
-    Write-Host "[CoreDNS] Uninstall: not present: $Data" -ForegroundColor Gray
+    Write-Host ('[CoreDNS] Uninstall: not present: {0}' -f $Data) -ForegroundColor Gray
   }
 
   Remove-Item -LiteralPath $Zip -Force -ErrorAction SilentlyContinue
@@ -137,7 +147,7 @@ if ($Uninstall) {
 
   $dnsAfter4a = '217.218.127.127'
   $dnsAfter4b = '217.218.155.155'
-  Write-Host "[CoreDNS] Uninstall: per-adapter DNS on Up adapters — IPv4 static $dnsAfter4a + $dnsAfter4b; IPv6 DHCP..." -ForegroundColor Cyan
+  Write-Host ('[CoreDNS] Uninstall: per-adapter DNS on Up adapters — IPv4 static {0} + {1}; IPv6 DHCP...' -f $dnsAfter4a, $dnsAfter4b) -ForegroundColor Cyan
   $dnsOk = 0
   $dnsFail = 0
   Get-NetAdapter -ErrorAction SilentlyContinue |
@@ -164,23 +174,23 @@ if ($Uninstall) {
           'validate=no'
         ) -Wait -NoNewWindow -PassThru
         if ($p4b.ExitCode -ne 0) {
-          Write-Warning ("[CoreDNS] Uninstall: netsh IPv4 add secondary DNS exit {0} on adapter {1}" -f $p4b.ExitCode, $na.Name)
+          Write-Warning ('[CoreDNS] Uninstall: netsh IPv4 add secondary DNS exit {0} on adapter {1}' -f $p4b.ExitCode, $na.Name)
         }
         $p6 = Start-Process -FilePath netsh.exe -ArgumentList @(
           'interface', 'ipv6', 'set', 'dnsservers', $nameArg, 'source=dhcp'
         ) -Wait -NoNewWindow -PassThru
         if ($p6.ExitCode -ne 0) {
-          Write-Warning ("[CoreDNS] Uninstall: netsh IPv6 DNS to DHCP exit {0} on adapter {1}" -f $p6.ExitCode, $na.Name)
+          Write-Warning ('[CoreDNS] Uninstall: netsh IPv6 DNS to DHCP exit {0} on adapter {1}' -f $p6.ExitCode, $na.Name)
         }
-        Write-Host ("[CoreDNS] Uninstall: DNS set: {0} (index {1})" -f $na.Name, $na.InterfaceIndex) -ForegroundColor Gray
+        Write-Host ('[CoreDNS] Uninstall: DNS set: {0} (index {1})' -f $na.Name, $na.InterfaceIndex) -ForegroundColor Gray
         $script:dnsOk++
       }
       catch {
         $script:dnsFail++
-        Write-Warning ("[CoreDNS] Uninstall: DNS failed on {0} (index {1}): {2}" -f $na.Name, $na.InterfaceIndex, $_.Exception.Message)
+        Write-Warning ('[CoreDNS] Uninstall: DNS failed on {0} (index {1}): {2}' -f $na.Name, $na.InterfaceIndex, $_.Exception.Message)
       }
     }
-  Write-Host ("[CoreDNS] Uninstall: DNS summary: {0} ok, {1} failed (see warnings)." -f $dnsOk, $dnsFail) -ForegroundColor $(if ($dnsFail -gt 0) { 'Yellow' } else { 'Gray' })
+  Write-Host ('[CoreDNS] Uninstall: DNS summary: {0} ok, {1} failed (see warnings).' -f $dnsOk, $dnsFail) -ForegroundColor $(if ($dnsFail -gt 0) { 'Yellow' } else { 'Gray' })
 
   Write-Host '[CoreDNS] Uninstall finished.' -ForegroundColor Green
   exit 0
@@ -191,14 +201,14 @@ if ([Net.ServicePointManager]::SecurityProtocol -notmatch 'Tls12') {
   [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 }
 
-Write-Host "[CoreDNS] Setup starting (CoreDNS $Ver)." -ForegroundColor Cyan
+Write-Host ('[CoreDNS] Setup starting (CoreDNS {0}).' -f $Ver) -ForegroundColor Cyan
 
 Write-Host '[CoreDNS] Ensuring install directories exist...' -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $BinDir, $Data -Force | Out-Null
 
 $skipBinaryInstall = Test-InstalledCoreDnsMatchesVer -ExePath $exe -WantVer $Ver
 if ($skipBinaryInstall) {
-  Write-Host "[CoreDNS] Binary already present and reports $Ver; skipping download and install." -ForegroundColor Gray
+  Write-Host ('[CoreDNS] Binary already present and reports {0}; skipping download and install.' -f $Ver) -ForegroundColor Gray
 }
 else {
   # Must stop/remove service before replacing coredns.exe (otherwise copy can fail on re-run).
@@ -207,7 +217,7 @@ else {
   Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
   New-Item -ItemType Directory -Path $Stage -Force | Out-Null
 
-  Write-Host "[CoreDNS] Downloading release zip..." -ForegroundColor Cyan
+  Write-Host '[CoreDNS] Downloading release zip...' -ForegroundColor Cyan
   $zipPart = $Zip + '.download'
   try {
     $iwParams = @{ Uri = $ZipUrl; OutFile = $zipPart; UseBasicParsing = $true }
@@ -218,7 +228,7 @@ else {
     Remove-Item -LiteralPath $zipPart -Force -ErrorAction SilentlyContinue
     throw
   }
-  Write-Host "[CoreDNS] Saved: $Zip" -ForegroundColor Gray
+  Write-Host ('[CoreDNS] Saved: {0}' -f $Zip) -ForegroundColor Gray
 
   Write-Host '[CoreDNS] Extracting zip...' -ForegroundColor Cyan
   Expand-Archive -Path $Zip -DestinationPath $Stage -Force
@@ -226,7 +236,7 @@ else {
   if (-not (Test-Path -LiteralPath $stagedExe)) {
     throw "Release zip did not contain coredns.exe at root: $stagedExe"
   }
-  Write-Host "[CoreDNS] Installing binary to: $exe" -ForegroundColor Cyan
+  Write-Host ('[CoreDNS] Installing binary to: {0}' -f $exe) -ForegroundColor Cyan
   Copy-Item -LiteralPath $stagedExe -Destination $exe -Force
   Write-Host '[CoreDNS] Binary version:' -ForegroundColor Cyan
   & $exe -version
@@ -252,7 +262,7 @@ $resLines = @(
   'nameserver 1.1.1.1',
   'nameserver 8.8.8.8'
 )
-Write-Host "[CoreDNS] Writing resolvers: $res" -ForegroundColor Cyan
+Write-Host ('[CoreDNS] Writing resolvers: {0}' -f $res) -ForegroundColor Cyan
 $resLines | Set-Content -Path $res -Encoding ascii -Force
 
 $core = Join-Path $Data 'Corefile'
@@ -279,7 +289,7 @@ $coreLines = @(
   '    errors',
   '}'
 )
-Write-Host "[CoreDNS] Writing Corefile: $core" -ForegroundColor Cyan
+Write-Host ('[CoreDNS] Writing Corefile: {0}' -f $core) -ForegroundColor Cyan
 $coreLines | Set-Content -Path $core -Encoding ascii -Force
 
 Write-Host '[CoreDNS] Config file paths:' -ForegroundColor Cyan
@@ -312,7 +322,7 @@ Get-Service -Name CoreDNS | Format-Table -AutoSize Status,Name,StartType
 # netsh for IPv4 and IPv6 (same path on all supported Windows; no Set-DnsClientServerAddress -AddressFamily).
 $dns4 = '127.0.0.1'
 $dns6 = '::1'
-Write-Host "[CoreDNS] Setting per-adapter DNS via netsh to $dns4 (IPv4) and $dns6 (IPv6) on Up adapters..." -ForegroundColor Cyan
+Write-Host ('[CoreDNS] Setting per-adapter DNS via netsh to {0} (IPv4) and {1} (IPv6) on Up adapters...' -f $dns4, $dns6) -ForegroundColor Cyan
 $dnsOk = 0
 $dnsFail = 0
 Get-NetAdapter -ErrorAction SilentlyContinue |
@@ -340,9 +350,9 @@ Get-NetAdapter -ErrorAction SilentlyContinue |
         'validate=no'
       ) -Wait -NoNewWindow -PassThru
       if ($p6.ExitCode -ne 0) {
-        Write-Warning ("[CoreDNS] netsh IPv6 DNS exit {0} on adapter {1} (IPv4 set to {2})." -f $p6.ExitCode, $ifName, $dns4)
+        Write-Warning ('[CoreDNS] netsh IPv6 DNS exit {0} on adapter {1} (IPv4 set to {2}).' -f $p6.ExitCode, $ifName, $dns4)
       }
-      Write-Host ("[CoreDNS] DNS set: {0} (index {1})" -f $na.Name, $na.InterfaceIndex) -ForegroundColor Gray
+      Write-Host ('[CoreDNS] DNS set: {0} (index {1})' -f $na.Name, $na.InterfaceIndex) -ForegroundColor Gray
       $script:dnsOk++
     }
     catch {
@@ -350,6 +360,6 @@ Get-NetAdapter -ErrorAction SilentlyContinue |
       Write-Warning ("DNS not set on adapter {0} (index {1}): {2}" -f $na.Name, $na.InterfaceIndex, $_.Exception.Message)
     }
   }
-Write-Host ("[CoreDNS] Adapter DNS summary: {0} ok, {1} skipped/failed (see warnings)." -f $dnsOk, $dnsFail) -ForegroundColor $(if ($dnsFail -gt 0) { 'Yellow' } else { 'Gray' })
+Write-Host ('[CoreDNS] Adapter DNS summary: {0} ok, {1} skipped/failed (see warnings).' -f $dnsOk, $dnsFail) -ForegroundColor $(if ($dnsFail -gt 0) { 'Yellow' } else { 'Gray' })
 
 Write-Host 'CoreDNS setup finished.' -ForegroundColor Green

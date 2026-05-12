@@ -53,19 +53,19 @@ curl -fsSL 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/releas
 **Install / upgrade / re-apply config**
 
 ```powershell
-$u = 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/release/installer/windows.ps1'
-$p = Join-Path $env:TEMP 'install_coredns_windows.ps1'
-Invoke-WebRequest -Uri $u -OutFile $p -UseBasicParsing
-powershell.exe -ExecutionPolicy Bypass -File $p
+$u = 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/release/installer/windows.ps1';
+$p = Join-Path $env:TEMP 'install_coredns_windows.ps1';
+Invoke-WebRequest -Uri $u -OutFile $p -UseBasicParsing;
+powershell.exe -ExecutionPolicy Bypass -File $p;
 ```
 
 **Uninstall**
 
 ```powershell
-$u = 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/release/installer/windows.ps1'
-$p = Join-Path $env:TEMP 'install_coredns_windows.ps1'
-Invoke-WebRequest -Uri $u -OutFile $p -UseBasicParsing
-powershell.exe -ExecutionPolicy Bypass -File $p -Uninstall
+$u = 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/release/installer/windows.ps1';
+$p = Join-Path $env:TEMP 'install_coredns_windows.ps1';
+Invoke-WebRequest -Uri $u -OutFile $p -UseBasicParsing;
+powershell.exe -ExecutionPolicy Bypass -File $p -Uninstall;
 ```
 
 ---

@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# CoreDNS (aleskxyz) Linux install — download, /etc/coredns, systemd, resolv.conf.
-# Requires root. Matches docs/install-linux-aleskxyz-binaries.md layout.
+# CoreDNS (aleskxyz) Linux install — download binary, /etc/coredns, systemd, resolv.conf.
+# Requires root.
 #
-#   sudo bash docs/install-linux-aleskxyz.sh
-#   sudo bash docs/install-linux-aleskxyz.sh --uninstall
+# Remote (release branch):
+#   curl -fsSL 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/release/installer/linux.sh' | sudo bash
+#   curl -fsSL 'https://raw.githubusercontent.com/aleskxyz/coredns/refs/heads/release/installer/linux.sh' | sudo bash -s -- --uninstall
+#
+# From a clone:
+#   sudo bash installer/linux.sh
+#   sudo bash installer/linux.sh --uninstall
 #
 # If /usr/local/bin/coredns already reports the same version as VER below, the tarball
 # download/extract is skipped (delete the binary or bump VER to force refresh).
